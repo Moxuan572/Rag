@@ -1,23 +1,27 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File,HTTPException
 import os
-from a_rag.vector_db import build_db  # 内部我也会帮你改成异步调用
+from a_rag.vector_db import build_db
 
-file_paths = None
-os.makedirs("file_upload", exist_ok=True)
+
+os.makedirs("upload_file", exist_ok=True)
 
 app01 = APIRouter()
 
 
 @app01.post("/UploadFile")
-async def upload(file: UploadFile = File(...), file_name: str = "temp.pdf"):
-    global file_paths
+async def upload(file:UploadFile = File(...),file_name: str="temp.pdf"):
+    try:
+        files = await file.read()
+        file_name = os.path.basename(file_name)
+        path = os.path.join("upload_file",file_name)
+        with open(path,"wb") as f:
+            f.write(files)
 
-    files = await file.read()
+        await build_db(path)
 
-    file_paths = os.path.join("file_upload", file_name)
-    with open(file_paths, "wb") as f:
-        f.write(files)
-
-    await build_db(file_paths)
-
-    return {"file_name": file_name}
+        return {"message":"上传成功并且数据库建好"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"文件处理失败：{str(e)}"
+        )
